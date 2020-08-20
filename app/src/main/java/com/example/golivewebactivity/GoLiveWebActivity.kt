@@ -1,6 +1,7 @@
 package com.example.golivewebactivity
 
 import android.Manifest
+import android.graphics.Bitmap
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -8,7 +9,7 @@ import android.webkit.*
 import kotlinx.android.synthetic.main.activity_go_live_web.*
 import pub.devrel.easypermissions.EasyPermissions
 
-class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallbacks {
+class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallbacks,AndroidInterface.SelectImageButtonClickListener {
 
     companion object{
         private const val REQUEST_CAMERA_PERMISSION = 1
@@ -20,6 +21,8 @@ class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallback
         private val PERM_AUDIO= arrayOf(
             Manifest.permission.RECORD_AUDIO, Manifest.permission.CAPTURE_AUDIO_OUTPUT,
             Manifest.permission.MODIFY_AUDIO_SETTINGS)
+        private const val DESKTOP_USER_AGENT= "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36"
+
 
     }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,6 +30,9 @@ class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallback
         setContentView(R.layout.activity_go_live_web)
 
         web_view_home.apply {
+            addJavascriptInterface(AndroidInterface(this@GoLiveWebActivity),"Android")
+            this.isScrollbarFadingEnabled = false;
+            scrollBarStyle=WebView.SCROLLBARS_OUTSIDE_OVERLAY
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
                     view: WebView?,
@@ -36,13 +42,19 @@ class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallback
                     return super.shouldOverrideUrlLoading(view, request)
                 }
 
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    loadJS(web_view_home)
+                }
             }
 
             webChromeClient = object : WebChromeClient() {
 
                 override fun onPermissionRequest(request: PermissionRequest?) {
                    // super.onPermissionRequest(request)
+
                     Log.d(TAG, "onPermissionRequest: ")
+
                     if(!hasCameraPermission())
                     {
 
@@ -64,6 +76,7 @@ class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallback
                         )
                     }
                     request?.grant(request?.resources)
+
                 }
 
 
@@ -95,8 +108,10 @@ class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallback
             layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
             useWideViewPort = true
             setRenderPriority(WebSettings.RenderPriority.HIGH)
-            setAppCacheEnabled(true)
-            cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+            setAppCacheEnabled(false)
+            cacheMode = WebSettings.LOAD_NO_CACHE
+            userAgentString= DESKTOP_USER_AGENT
+            loadWithOverviewMode=true
 
         }
 
@@ -140,5 +155,35 @@ class GoLiveWebActivity : AppCompatActivity(),EasyPermissions.PermissionCallback
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
 
+    }
+    private fun loadJS(webView: WebView) {
+        webView.loadUrl(
+            """javascript:(function f() {
+        var divs = document.getElementsByClassName('startTeachingButton');
+        for (var i = 0, n = divs.length; i < n; i++) {
+             
+            divs[i].addEventListener('click',function(){
+               Android.onButtonsClicked();
+            })
+          
+        }
+        
+      })()"""
+        )
+    }
+
+    override fun onStartMeetingButtonClicked() {
+        EasyPermissions.requestPermissions(
+            this@GoLiveWebActivity ,
+            "This app needs access to your camera so you can take pictures.",
+            REQUEST_CAMERA_PERMISSION,
+            *PERM_CAMERA
+        )
+        EasyPermissions.requestPermissions(
+            this@GoLiveWebActivity,
+            "This app needs access to your audio so you can use microphone",
+            REQUEST_AUDIO_PERMISSION,
+            *PERM_AUDIO
+        )
     }
 }
